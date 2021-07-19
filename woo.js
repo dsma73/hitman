@@ -116,6 +116,25 @@ async function autoScroll(page){
 }
 
 
+async function naverLogin(user, pwd){
+    logger.debug(`trying to login ${user} ${pwd}`)
+    const loginUrl = "https://nid.naver.com/nidlogin.login";
+    
+    const naver_id = user;
+    const naver_pw = pwd;
+    
+    await browserPage.goto(loginUrl);
+    
+    await browserPage.evaluate((id, pw) => {
+        document.querySelector('#id').value = id;
+        document.querySelector('#pw').value = pw;
+    }, naver_id, naver_pw);
+    
+    await browserPage.click('.btn_global');
+    await browserPage.waitForNavigation();
+
+}
+
 async function loadPage( ){
     
     let pages = await Browser.pages();
@@ -135,7 +154,7 @@ async function loadPage( ){
             setTimeout(()=>{
                 logger.debug("close page");
                 r();
-            },3000)
+            },5000)
         });
 
     }catch(e){return;}
@@ -164,15 +183,21 @@ async function loadPage( ){
     initBrowser().then(
         async (init) =>{
             browserPage = init;
- 
-            for( let i of options.items ){
-                let retry = i.count || 100;
-                for( j = 0 ; j < retry; j++){
-                    logger.info(`try to load ${j}`)
-                    await loadPage( );
-                }
-               
-             }    
+            for( let user of options.users ){
+                await  naverLogin(user.id,user.pwd);
+
+                for( let i of options.items ){
+                    let retry = i.count || 10;
+                    for( j = 0 ; j < retry; j++){
+        
+                        await loadPage( );
+                    }
+                }    
+
+                const client = await browserPage.target().createCDPSession();
+                await client.send('Network.clearBrowserCookies');
+               await client.send('Network.clearBrowserCache');
+            }    
              closeBrowser();
              process.exit();
         }

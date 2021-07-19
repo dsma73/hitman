@@ -115,11 +115,29 @@ async function autoScroll(page){
                     clearInterval(timer);
                     resolve();
                 }
-            }, 90);
+            }, 1000);
         });
     });
 }
 
+async function naverLogin(user, pwd){
+    logger.debug(`trying to login ${user} ${pwd}`)
+    const loginUrl = "https://nid.naver.com/nidlogin.login";
+    
+    const naver_id = user;
+    const naver_pw = pwd;
+    
+    await browserPage.goto(loginUrl);
+    
+    await browserPage.evaluate((id, pw) => {
+        document.querySelector('#id').value = id;
+        document.querySelector('#pw').value = pw;
+    }, naver_id, naver_pw);
+    
+    await browserPage.click('.btn_global');
+    await browserPage.waitForNavigation();
+
+}
 
 async function puppeteer_findItem( keyword, categoryMid, pageIdx ){
     logger.debug(`findItem : key: ${keyword} mid: ${categoryMid} idx:${pageIdx}`);
@@ -130,13 +148,7 @@ async function puppeteer_findItem( keyword, categoryMid, pageIdx ){
         url = `https://search.shopping.naver.com/search/all?query=${keyword}&cat_id=&frm=NVSHATC`;
     }else{
         url= `https://search.shopping.naver.com/search/all?frm=NVSHATC&origQuery=${keyword}&pagingIndex=${pageIdx}&pagingSize=20&productSet=total&query=${keyword}&sort=rel&timestamp=&viewType=list`
-     //         https://search.shopping.naver.com/search/all?frm=NVSHATC&origQuery=%EB%89%B4%EC%A7%88%EB%9E%9C%EB%93%9C%20%ED%94%8C%EB%A1%9C%ED%8F%B4%EB%A6%AC%EC%8A%A4&pagingIndex=2&pagingSize=40&productSet=total&query=%EB%89%B4%EC%A7%88%EB%9E%9C%EB%93%9C%20%ED%94%8C%EB%A1%9C%ED%8F%B4%EB%A6%AC%EC%8A%A4&sort=rel&timestamp=&viewType=list#
     }
-
-    const client = await browserPage.target().createCDPSession();
-    await client.send('Network.clearBrowserCookies');
-    await client.send('Network.clearBrowserCache');
-
 
     await browserPage.goto( url)
     await autoScroll(browserPage);
@@ -175,7 +187,7 @@ async function puppeteer_findItem( keyword, categoryMid, pageIdx ){
                 });             
             try{ 
                 await npage.waitForNavigation();
-                await autoScroll(npage,60);
+                await autoScroll(npage,1500);
             }catch(e){}
             await npage.close();
             return;
@@ -185,64 +197,6 @@ async function puppeteer_findItem( keyword, categoryMid, pageIdx ){
     logger.info("can't find ");
 }
 
-async function cheerio_findItem( keyword, categoryMid, pageIdx ){
-    logger.debug(`findItem : key: ${keyword} mid: ${categoryMid} idx:${pageIdx}`);
-    let found = false;
-
-    let url = '';
-    if( !pageIdx ){
-        url = `https://search.shopping.naver.com/search/all?query=${keyword}&cat_id=&frm=NVSHATC`;
-    }else{
-        url= `https://search.shopping.naver.com/search/all?frm=NVSHATC&origQuery=${keyword}&pagingIndex=${pageIdx}&pagingSize=20&productSet=total&query=${keyword}&sort=rel&timestamp=&viewType=list`
-     //         https://search.shopping.naver.com/search/all?frm=NVSHATC&origQuery=%EB%89%B4%EC%A7%88%EB%9E%9C%EB%93%9C%20%ED%94%8C%EB%A1%9C%ED%8F%B4%EB%A6%AC%EC%8A%A4&pagingIndex=2&pagingSize=40&productSet=total&query=%EB%89%B4%EC%A7%88%EB%9E%9C%EB%93%9C%20%ED%94%8C%EB%A1%9C%ED%8F%B4%EB%A6%AC%EC%8A%A4&sort=rel&timestamp=&viewType=list#
-    }
-
-    response = await axios.get(url,{
-        headers: HEADER
-    });
-
-
-    const jqInc = "<script type=\"text/javascript\" src=\"https://code.jquery.com/jquery-1.12.0.min.js\"></script>"
-    $ = cheerio.load( response.data + jqInc );
-    if( $('[class^="noResult_no_result"]').length > 0 ){            
-        logger.debug(`Can't find result search:${keyword} pageNo: ${pageIdx} url:${url}`);
-        return new Promise( resolve => resolve(undefined));
-    }
-    
-    let rst = $('[class^="basicList_link"]');
-
-    $('[class^="basicList_link"]').each( (idx,item) =>{
-        let ca_mid = item.attribs['data-nclick'];
-
-        
-        //신고하기에 category_mid가 포함되어있으면.    
-        if( ca_mid  && ca_mid.indexOf(categoryMid) > 0 ){
-            logger.info('Find it! '+ca_mid);
-            found = item;
-/*                
-            let nextUrl = item.attribs['href'];
-            
-            // 다음 depth가 상품 상세인지 가격비교인지 판단한다.
-            if( $(this).closest( '[class^="basicList_inner"]' ).find('[class^="basicList_mall_name"]').length > 1 ){
-                logger.info(' next url is price compare');
-            } else{
-                logger.info('next url is product detail');    
-            }
-*/
-            return false;
-        }
-    })
-
-    if( !pageIdx ){
-        pageIdx = 1;
-    }
-    if( !found )
-        return findItem( keyword, categoryMid, pageIdx+1);
-    else{
-        return new Promise( r => r(found));
-    }    
-
-}
 
 (async function main(){
 	var options={};
@@ -262,22 +216,30 @@ async function cheerio_findItem( keyword, categoryMid, pageIdx ){
     }
 
     initBrowser().then(
+      
         async (init) =>{
-            browserPage = init;            
-            for( let i of options.items ){
-                let retry = i.count || 100;
-                for( j = 0 ; j < retry; j++){
-                    logger.info(`trying to find  ${i.keyword} ${j}`  );
-                    await puppeteer_findItem( encodeURI( i.keyword.replaceAll(' ','+') ), i.ca_mid);
-                }
-               
-             }
+            browserPage = init;
+
+          for( let user of options.users ){
+              logger.info(`login with id:${user.id} pwd:${user.pwd} `)
+              await  naverLogin(user.id,user.pwd);
+
+                for( let i of options.items ){
+                    let retry = i.count || 10;
+                    for( j = 0 ; j < retry; j++){
+                        logger.info(`trying to find  ${i.keyword} ${j}`  );
+                        await puppeteer_findItem( encodeURI( i.keyword.replaceAll(' ','+') ), i.ca_mid);
+                    }
+                 }
+
+                const client = await browserPage.target().createCDPSession();
+                 await client.send('Network.clearBrowserCookies');
+                await client.send('Network.clearBrowserCache');
+            }            
              closeBrowser();
              process.exit();
         }
     );
-
-
 })();
 
 
