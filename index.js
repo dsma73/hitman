@@ -10,6 +10,7 @@ const { combine, timestamp, printf } = winston.format;
 
 let fs = require('fs');
 const path = require('path');
+const { captureRejections } = require('events');
 let browserPage;
 let Browser;
 
@@ -228,7 +229,12 @@ async function puppeteer_findItem( keyword, categoryMid, pageIdx ){
                     let retry = i.count || 10;
                     for( j = 0 ; j < retry; j++){
                         logger.info(`trying to find  ${i.keyword} ${j}`  );
-                        await puppeteer_findItem( encodeURI( i.keyword.replaceAll(' ','+') ), i.ca_mid);
+                        try{
+                            await puppeteer_findItem( encodeURI( i.keyword.replaceAll(' ','+') ), i.ca_mid);
+                    
+                        }catch(e){
+                            continue;
+                        }
                     }
                  }
 
