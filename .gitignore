@@ -1,0 +1,5 @@
+conf/
+*.log
+*.log.gz
+node_modules/
+*audit.json
