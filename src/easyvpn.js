@@ -59,8 +59,8 @@ const startOpenvpn = async (options = []) => {
     }
     );
 
-  process.on('exit', () => proc.kill());
-  process.on('SIGINT', () => proc.kill());
+  proc.on('exit', () => proc.kill());
+  proc.on('SIGINT', () => proc.kill());
 
   _timer = setTimeout(()=>{
     if( _resolved )

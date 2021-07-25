@@ -68,11 +68,12 @@ function filter(vpns){
         return;
     }
     await easyVpn.disconnect();
-    browserPagee = await naverService.initBrowser();
+    browserPage = await naverService.initBrowser();
+    const FIRST_URL = "https://map.naver.com/v5/search/%EC%84%B1%EB%82%A8%EC%84%A4%EB%B9%84/place/31022964?placePath=%3Fentry=pll%26from=nx%26fromNxList=true&c=14154930.9410483,4501436.4309725,15,0,0,0,dh"
 
     for( let vpnIndex = 0 ; vpnIndex < vpns.length ; vpnIndex++){
         let vpn = vpns[ vpnIndex ];
-        logger.info(`trying to get IP from ${vpn.ip} ${vpn.countryLong}`);
+        logger.info(`trying to get IP from ${vpnIndex+1}th proxy. ${vpn.ip} ${vpn.countryShort}`);
         try{
             await easyVpn.connect(vpn);
             logger.info(`IP changing was completed`);
@@ -82,13 +83,19 @@ function filter(vpns){
             continue;
         }
 
-        for( let i of options.items ){
+        for( let i=0 ; i < options.items.length; i++){
+            let optionItem = options.items[i];
             let retry = i.count || 1;
             for( j = 0 ; j < retry; j++){
                 try{
                     for( let k = 0 ; k < options.user_agents.length ; k++){
-                        logger.info(`trying to find  [${i.keyword}] with ${options.user_agents[k]}`  );
-                        await naverService.findAndClick( browserPagee,encodeURI( i.keyword.split(' ').join('+') ), i.ca_mid, options.user_agents[k]);
+                        let userAgentString = options.user_agents[k];
+                        let opt ={
+                            shouldScroll:true,
+                            userAgent:userAgentString
+                        }
+                        logger.info(`trying to find  [${optionItem.keyword}] with ${userAgentString}`  );
+                        await naverService.findAndClick( browserPage,encodeURI( optionItem.keyword.split(' ').join('+') ), optionItem.ca_mid, options.user_agents[k]);
                     }
                 }catch(e){
                     logger.error(e);
@@ -96,7 +103,7 @@ function filter(vpns){
                 }
             }
         }
-        await naverService.clearCookie(browserPagee);
+        await naverService.clearCookie(browserPage);
         await easyVpn.disconnect();
         logger.info(`IP was recovered.`);
     }    

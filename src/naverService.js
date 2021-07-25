@@ -27,7 +27,7 @@ async function initBrowser(){
     
     const browser = await puppeteer.launch(options);
     let pages = await browser.pages();
-    const page = pages[0];
+    const page = await browser.newPage();
     page.setDefaultNavigationTimeout(0);
     await page.setViewport({
     'width':WIDTH,
@@ -52,9 +52,8 @@ async function closeBrowser(){
     await Browser.close();
 }
 
-
 async function autoScroll(page){
- 
+    logger.debug('autoScroll');
     await page.evaluate(async (timeout) => {
         await new Promise((resolve, reject) => {
             var totalHeight = 0;
@@ -68,9 +67,10 @@ async function autoScroll(page){
                     clearInterval(timer);
                     resolve();
                 }
-            }, 100);
+            }, 500);
         });
     });
+
 }
 
 
@@ -92,6 +92,86 @@ async function naverLogin(user, pwd){
     await browserPage.waitForNavigation();
 }
 
+async function visitUrl( url,opt){
+    opt = opt || {};
+
+    opt.timeout = opt.timeout || 1000 * 3;
+    let npage = await Browser.newPage();
+
+    if( opt.userAgent )
+        await npage.setUserAgent(opt.userAgent);
+//    try{
+    await npage.goto( url);
+//    await npage.waitForNavigation();
+
+    if( opt.shouldScroll ){
+        await autoScroll(npage);
+    }
+    setTimeout(()=> npage.close(),1000*2)
+  // }catch(e){
+  //      logger.error(e);
+  //      npage.close();
+   //     Promise.resolve();
+   // }
+
+}
+
+async function visitBlogAndClick( browserPage, blogId, clickLatest, userAgent ){
+    let url = `https://blog.naver.com/${blogId}`;
+    if( userAgent )
+        await browserPage.setUserAgent(userAgent);
+    await browserPage.goto(url);
+//    await browserPage.waitForNavigation();
+//    await autoScroll(browserPage);
+
+    const linkList = await browserPage.evaluate(() => {
+        let els=[];
+        document.querySelectorAll('iframe').forEach( item =>{
+                let thumbnails = item.contentWindow.document.body.querySelectorAll('#PostThumbnailAlbumViewArea > ul > li> a');
+
+                if( thumbnails && thumbnails.length > 0){
+                    els = Array.from( thumbnails);
+
+                }
+            }
+        )
+
+        let links = els.map( el =>{
+            el.id = 'link_'+ Math.floor(Math.random() * 1000); 
+            
+          return{
+           "href" : el.getAttribute('href'),
+           id: el.id
+          }
+        });
+        return links;
+    }
+    );
+
+    let el = linkList[0];
+
+    if( !clickLatest ){
+        el =linkList[Math.floor(Math.random() * linkList.length)];
+    }
+
+    logger.debug(`click to ${el.id}`);
+
+    const frame = await browserPage.frames().find(frame => frame.name() === 'mainFrame');
+
+    await frame.click("#"+el.id,{button: 'middle'});
+          
+    let pages = await Browser.pages();
+    let npage = pages[pages.length-1];
+    await npage.setViewport({
+        width:WIDTH,
+        height:HEIGHT
+        });             
+    try{ 
+        await npage.waitForNavigation();
+        await autoScroll(npage,300);
+    }catch(e){}
+    await npage.close();
+}
 
 async function findAndClick( browserPage, keyword, categoryMid, userAgent ){
     logger.debug(`findItem : key: ${keyword} mid: ${categoryMid} ${userAgent}`);
@@ -103,8 +183,9 @@ async function findAndClick( browserPage, keyword, categoryMid, userAgent ){
     url = `https://search.shopping.naver.com/search/all?query=${keyword}&cat_id=&frm=NVSHATC`;
     
 
-    await browserPage.goto( url)
-    await autoScroll(browserPage);
+    await browserPage.goto( url);
+//    await browserPage.waitForNavigation();
+//    await autoScroll(browserPage);
 
     const linkList = await browserPage.evaluate(() => {
                                             let els = Array.from(document.querySelectorAll('[class^="basicList_link"]'));
@@ -155,5 +236,7 @@ module.exports = {
     closeBrowser,
     autoScroll,
     findAndClick,
-    clearCookie
+    clearCookie,
+    visitUrl,
+    visitBlogAndClick
 }
