@@ -26,7 +26,8 @@ async function initBrowser(){
     const device = puppeteer.devices['iPhone X'];
     
     const browser = await puppeteer.launch(options);
-    const page = await browser.newPage();
+    let pages = await browser.pages();
+    const page = pages[0];
     page.setDefaultNavigationTimeout(0);
     await page.setViewport({
     'width':WIDTH,
@@ -92,16 +93,14 @@ async function naverLogin(user, pwd){
 }
 
 
-async function findAndClick( browserPage, keyword, categoryMid, pageIdx ){
-    logger.debug(`findItem : key: ${keyword} mid: ${categoryMid} idx:${pageIdx}`);
+async function findAndClick( browserPage, keyword, categoryMid, userAgent ){
+    logger.debug(`findItem : key: ${keyword} mid: ${categoryMid} ${userAgent}`);
     let found = false;
-
+    if( userAgent )
+        await browserPage.setUserAgent(userAgent);
     let url = '';
-    if( !pageIdx ){
-        url = `https://search.shopping.naver.com/search/all?query=${keyword}&cat_id=&frm=NVSHATC`;
-    }else{
-        url= `https://search.shopping.naver.com/search/all?frm=NVSHATC&origQuery=${keyword}&pagingIndex=${pageIdx}&pagingSize=20&productSet=total&query=${keyword}&sort=rel&timestamp=&viewType=list`
-    }
+
+    url = `https://search.shopping.naver.com/search/all?query=${keyword}&cat_id=&frm=NVSHATC`;
     
 
     await browserPage.goto( url)

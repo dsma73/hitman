@@ -17,7 +17,7 @@ Error message: ${err.message}`;
 }
 
 function filter(chunk, enc, cb) {
-  const createBuffer = data => new Buffer(data, DEFAULT_ENCODE);
+  const createBuffer = data => new Buffer.from(data, DEFAULT_ENCODE);
   const lines = chunk.toString()
     .split('\r\n')
     .filter(line => (line !== '*vpn_servers' && line !== '*'))
