@@ -55,7 +55,7 @@ async function closeBrowser(){
 }
 
 async function autoScroll(page,delay){
-    logger.debug('autoScroll');
+   
     await page.evaluate(async (_delay) => {
         await new Promise((resolve, reject) => {
             var totalHeight = 0;
@@ -69,10 +69,10 @@ async function autoScroll(page,delay){
                     clearInterval(timer);
                     resolve();
                 }
-            }, _delay || 700);
+            }, _delay || 500);
         });
-    },delay);
-    logger.debug('auto scroll end')
+    },delay || 500);
+
 }
 
 
@@ -118,7 +118,9 @@ async function visitUrl( url,opt){
 
 }
 
-async function visitBlogAndClick( browserPage, blogId, clickLatest, userAgent ){
+async function visitBlogAndClick( browserPage, blogId, clickLatest, userAgent,delay ){
+    delay = delay || 1000;
+
     let url = `https://blog.naver.com/${blogId}`;
     if( userAgent )
         await browserPage.setUserAgent(userAgent);
@@ -127,8 +129,7 @@ async function visitBlogAndClick( browserPage, blogId, clickLatest, userAgent ){
     }catch(e){
         return;
     }
-    await browserPage.waitForNavigation();
-    await autoScroll(browserPage,600);
+    await autoScroll(browserPage,delay);
 
     const linkList = await browserPage.evaluate(() => {
         let els=[];
@@ -163,9 +164,19 @@ async function visitBlogAndClick( browserPage, blogId, clickLatest, userAgent ){
     logger.debug(`click to ${el.id}`);
 
     const frame = await browserPage.frames().find(frame => frame.name() === 'mainFrame');
+    await frame.click("#"+el.id);
+    try{ 
+          await browser.waitForNavigation();
+          await autoScroll(browserPage,delay);
+    }catch(e){
+        await new Promise((resolve, reject) => 
+            setTimer(()=>resolve(),1000*3)
+        ) ;
+    }
 
-    await frame.click("#"+el.id,{button: 'middle'});
-          
+    return;
+        
+    /*
     let pages = await Browser.pages();
     let npage = pages[pages.length-1];
     await npage.setViewport({
@@ -175,12 +186,20 @@ async function visitBlogAndClick( browserPage, blogId, clickLatest, userAgent ){
 
     try{ 
 //        await npage.waitForNavigation();
-        await autoScroll(npage,600);
+        await autoScroll(npage,delay);
     }catch(e){
         logger.error('error in auto scrolling detail view'+e);
+        await new Promise((resolve, reject) => 
+                setTimer(()=>resolve(),1000*3)
+            );
     }
 
     await npage.close();
+
+*/
+
+
+
 }
 
 async function findAndClick( browserPage, keyword, categoryMid, userAgent, delay ){
