@@ -38,9 +38,11 @@ async function initBrowser(){
 }
 
 async function clearCookie(_page){
-    const client = await _page.target().createCDPSession();
-    await client.send('Network.clearBrowserCookies');
-    await client.send('Network.clearBrowserCache');
+    try{
+        const client = await _page.target().createCDPSession();
+        await client.send('Network.clearBrowserCookies');
+        await client.send('Network.clearBrowserCache');
+    }catch(e){}
 }
 
 async function closeBrowser(){
@@ -52,9 +54,9 @@ async function closeBrowser(){
     await Browser.close();
 }
 
-async function autoScroll(page){
+async function autoScroll(page,delay){
     logger.debug('autoScroll');
-    await page.evaluate(async (timeout) => {
+    await page.evaluate(async (_delay) => {
         await new Promise((resolve, reject) => {
             var totalHeight = 0;
             var distance = 100;
@@ -67,10 +69,10 @@ async function autoScroll(page){
                     clearInterval(timer);
                     resolve();
                 }
-            }, 500);
+            }, _delay || 700);
         });
-    });
-
+    },delay);
+    logger.debug('auto scroll end')
 }
 
 
@@ -120,9 +122,13 @@ async function visitBlogAndClick( browserPage, blogId, clickLatest, userAgent ){
     let url = `https://blog.naver.com/${blogId}`;
     if( userAgent )
         await browserPage.setUserAgent(userAgent);
-    await browserPage.goto(url);
-//    await browserPage.waitForNavigation();
-//    await autoScroll(browserPage);
+    try{
+        await browserPage.goto(url);
+    }catch(e){
+        return;
+    }
+    await browserPage.waitForNavigation();
+    await autoScroll(browserPage,600);
 
     const linkList = await browserPage.evaluate(() => {
         let els=[];
@@ -166,16 +172,20 @@ async function visitBlogAndClick( browserPage, blogId, clickLatest, userAgent ){
         width:WIDTH,
         height:HEIGHT
         });             
+
     try{ 
-        await npage.waitForNavigation();
-        await autoScroll(npage,300);
-    }catch(e){}
+//        await npage.waitForNavigation();
+        await autoScroll(npage,600);
+    }catch(e){
+        logger.error('error in auto scrolling detail view'+e);
+    }
+
     await npage.close();
 }
 
-async function findAndClick( browserPage, keyword, categoryMid, userAgent ){
+async function findAndClick( browserPage, keyword, categoryMid, userAgent, delay ){
     logger.debug(`findItem : key: ${keyword} mid: ${categoryMid} ${userAgent}`);
-    let found = false;
+    
     if( userAgent )
         await browserPage.setUserAgent(userAgent);
     let url = '';
@@ -185,7 +195,7 @@ async function findAndClick( browserPage, keyword, categoryMid, userAgent ){
 
     await browserPage.goto( url);
 //    await browserPage.waitForNavigation();
-//    await autoScroll(browserPage);
+    await autoScroll(browserPage,delay);
 
     const linkList = await browserPage.evaluate(() => {
                                             let els = Array.from(document.querySelectorAll('[class^="basicList_link"]'));
@@ -221,7 +231,7 @@ async function findAndClick( browserPage, keyword, categoryMid, userAgent ){
                 });             
             try{ 
                 await npage.waitForNavigation();
-                await autoScroll(npage,1500);
+                await autoScroll(npage,delay);
             }catch(e){}
             await npage.close();
             return;
