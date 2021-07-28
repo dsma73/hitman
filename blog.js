@@ -101,11 +101,13 @@ function filter(vpns){
                     logger.error(e);
                     continue;
                 }
+
+                try{
+                    await naverService.clearCookie(browserPage);
+                }catch(e){}                
             }
         }
-        try{
-            await naverService.clearCookie(browserPage);
-        }catch(e){}
+
 
         if( options.useVpn){
             await easyVpn.disconnect();

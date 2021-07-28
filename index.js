@@ -105,6 +105,10 @@ function filter(vpns){
                                                         optionItem.ca_mid, options.user_agents[k],
                                                         options.scroll 
                                                         );
+                        try{
+                            await naverService.clearCookie(browserPage);
+                        }catch(e){}
+                                                
                     }
                 }catch(e){
                     logger.error(e);
@@ -112,9 +116,6 @@ function filter(vpns){
                 }
             }
         }
-        try{
-            await naverService.clearCookie(browserPage);
-        }catch(e){}
 
         if( options.useVpn == true){
             await easyVpn.disconnect();
