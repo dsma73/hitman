@@ -96,7 +96,6 @@ async function connect (vpn) {
 };
 
 async function disconnect(){
-
     try{
       logger.debug(`trying to release IP `);
 
@@ -118,7 +117,33 @@ async function disconnect(){
   return new Promise(resolve => setTimeout(resolve, 1000 * 10));
 }
 
+
+
+async function cleanBrowser(){
+
+  try{
+    logger.debug(`trying to release IP `);
+
+    ps.lookup({
+      command: 'chromium',
+      }, function(err, resultList ) {
+      if (err) {
+          throw new Error( err );
+      }
+   
+      resultList.forEach(function( proc ){
+          if( proc ){
+              process.kill(proc.pid,SIGINT);
+          }
+      });
+  });
+
+  }catch(e){}
+
+}
+
 module.exports ={
     connect,
-    disconnect
+    disconnect,
+    cleanBrowser
 }

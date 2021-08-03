@@ -23,7 +23,7 @@ function loadConfig( filePath ){
 		return JSON.parse(data);
 	}catch(e){
 		logger.error("can't parse config.cfg. use default value:");
-        logger.error(e);
+        logger.error(e.message + e.stack);
         return {};
 	}
 }
@@ -53,22 +53,25 @@ function filter(vpns){
         return;
     }
 
-    let vpns;
+    let vpns=[];
     
-    try{
-         vpns = await ListVPNs(options.proxy); 
-        const countries = Array.from(new Set(vpns.map(vpn => vpn.countryShort)));
-        vpns = filter(vpns);
-        logger.info(`Available proxies :  ${vpns.length}`)
-        vpns = vpns.sort((a, b) => (b.score - a.score));
-    }catch(e){
-        logger.error("can't connect VPN");
-        logger.error(e.message);
-        process.exit();
-        return;
+    if( options.useVpn == true){
+        try{
+            vpns = await ListVPNs(options.proxy); 
+            const countries = Array.from(new Set(vpns.map(vpn => vpn.countryShort)));
+            vpns = filter(vpns);
+            vpns = vpns.sort((a, b) => (b.score - a.score));
+            vpns = vpns.slice ( 0, Math.ceil( vpns.length /2) ); // 하위 1/2는 버린다.
+            vpns = vpns.sort(() => Math.random() * 10);
+            logger.info(`available Proxies : ${vpns.length}`);
+        }catch(e){
+            logger.error(e.message);
+            process.exit();
+            return;
+        }
+        
+        await easyVpn.disconnect();
     }
-    
-    await easyVpn.disconnect();
 
     browserPage = await naverService.initBrowser();
 
@@ -83,35 +86,40 @@ function filter(vpns){
                 await easyVpn.connect(vpn);
                 logger.info(`IP changing was completed`);
             }catch(e){
-                logger.error(e);
                 logger.error(`can't connect VPN ${vpn.ip}`);
                 continue;
             }
         }
+
+        // shuffle item array
+        options.items = options.items.sort(() => Math.random() * 10 );
 
         for( let i=0 ; i < options.items.length; i++){
             let optionItem = options.items[i];
             let retry = optionItem.count || 1;
             for( j = 0 ; j < retry; j++){
                 try{
-                    for( let k = 0 ; k < options.user_agents.length ; k++){
-                        let userAgentString = options.user_agents[k];
-                        let opt ={
-                            shouldScroll:true,
-                            userAgent:userAgentString
-                        }
-                        logger.info(`trying to find  [${optionItem.keyword}] with ${userAgentString}`  );
+                    // shuffle user agent array
+                    options.user_agents = options.user_agents.sort(() => Math.random() * 10);
+
+                    let user_agents_length = Math.ceil( options.user_agents.length * Math.random()); 
+
+                    for( let k = 0 ; k < options.user_agents.length && k < user_agents_length; k++){
+                        
+                        logger.info(`[${optionItem.keyword}]  ${options.user_agents[k]}`)
                         await naverService.findAndClick( browserPage,encodeURI( optionItem.keyword.split(' ').join('+') ), 
                                                         optionItem.ca_mid, options.user_agents[k],
                                                         options.scroll 
                                                         );
                         try{
                             await naverService.clearCookie(browserPage);
-                        }catch(e){}
+                        }catch(e){
+                            logger.error(e.message + e.stack);
+                        }
                                                 
                     }
                 }catch(e){
-                    logger.error(e);
+                    logger.error(e.message + e.stack);
                     continue;
                 }
             }

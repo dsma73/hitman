@@ -58,8 +58,10 @@ function filter(vpns){
             vpns = await ListVPNs(options.proxy); 
             const countries = Array.from(new Set(vpns.map(vpn => vpn.countryShort)));
             vpns = filter(vpns);
-            logger.info(`Available proxies :  ${vpns.length}`)
             vpns = vpns.sort((a, b) => (b.score - a.score));
+            vpns = vpns.slice ( 0, vpns.length /2 ); // 하위 1/2는 버린다.
+            vpns = vpns.sort(() => Math.random() - 0.5);
+            logger.info(`available Proxies : ${vpns.length}`);
         }catch(e){
             logger.error("can't connect VPN");
             logger.error(e.message);
@@ -77,7 +79,7 @@ function filter(vpns){
     for( let vpnIndex = 0 ;   vpnIndex < vpns.length ; vpnIndex++){
         if( options.useVpn){
             let vpn = vpns[ vpnIndex ];
-            logger.info(`trying to get IP from ${vpnIndex+1}th proxy. ${vpn.ip} ${vpn.countryShort}`);
+            logger.info(`trying to get IP from ${vpnIndex+1}th proxy. ${vpn.ip} ${vpn.countryShort} ${vpn.score}`);
             try{
                 await easyVpn.connect(vpn);
                 logger.info(`IP changing was completed`);
@@ -107,7 +109,6 @@ function filter(vpns){
                 }catch(e){}                
             }
         }
-
 
         if( options.useVpn){
             await easyVpn.disconnect();

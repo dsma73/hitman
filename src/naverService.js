@@ -19,6 +19,8 @@ async function initBrowser(){
       args: [
 //        `--window-size=${WIDTH},${HEIGHT}`,
         '--start-maximized' ,
+        '--single-process', 
+        '--no-zygote',
         '--no-sandbox',
         '--disable-setuid-sandbox'
       ]
@@ -170,7 +172,7 @@ async function visitBlogAndClick( browserPage, blogId, clickLatest, userAgent,de
           await autoScroll(browserPage,delay);
     }catch(e){
         await new Promise((resolve, reject) => 
-            setTimer(()=>resolve(),1000*3)
+        setTimeout(()=>resolve(),1000*3)
         ) ;
     }
 
@@ -190,7 +192,7 @@ async function visitBlogAndClick( browserPage, blogId, clickLatest, userAgent,de
     }catch(e){
         logger.error('error in auto scrolling detail view'+e);
         await new Promise((resolve, reject) => 
-                setTimer(()=>resolve(),1000*3)
+                setTimeout(()=>resolve(),1000*3)
             );
     }
 
@@ -202,21 +204,62 @@ async function visitBlogAndClick( browserPage, blogId, clickLatest, userAgent,de
 
 }
 
+function isMobile(userAgent) {
+    return /iPhone|iPad|iPod|Android/i.test(userAgent);
+};
+
 async function findAndClick( browserPage, keyword, categoryMid, userAgent, delay ){
     logger.debug(`findItem : key: ${keyword} mid: ${categoryMid} ${userAgent}`);
-    
-    if( userAgent )
-        await browserPage.setUserAgent(userAgent);
+
     let url = '';
+    let selector;
+    let attribute="";
 
-    url = `https://search.shopping.naver.com/search/all?query=${keyword}&cat_id=&frm=NVSHATC`;
-    
+    if( userAgent ){
+        await browserPage.setUserAgent(userAgent);
+        if( isMobile(userAgent)){
+            url = `https://m.search.naver.com/search.naver?sm=mtb_hty.top&where=m&query=${keyword}`;    
 
-    await browserPage.goto( url);
-//    await browserPage.waitForNavigation();
-    await autoScroll(browserPage,delay);
+        }else{
+            url = `https://search.shopping.naver.com/search/all?query=${keyword}&cat_id=&frm=NVSHATC`;
+        }
+    }
+    try{
+        await browserPage.goto( url);
+    }catch(e){
+        logger.error("can't go to "+url +" reason: "+e.message);
+        return;
+    }
 
-    const linkList = await browserPage.evaluate(() => {
+    if( isMobile(userAgent)){
+        await new Promise((resolve, reject) => 
+            setTimeout(()=>resolve(),1000*3)
+        ) ;
+    }else{
+        await autoScroll(browserPage,delay);
+    }
+
+    let linkList;
+
+    if( isMobile(userAgent ) ){
+        linkList = await browserPage.evaluate(() => {
+                                                let els = Array.from(document.querySelectorAll('.product'));
+                                                
+                                                let links = els.map( el =>{
+                                                    el.id = 'link_'+ Math.floor(Math.random() * 1000); 
+                                                    
+                                                    parent = el.parentElement;
+                                                return{
+                                                    nclick : parent.getAttribute('data-nvmid'),
+                                                    href : el.getAttribute('href'),
+                                                    id: el.id
+                                                }
+                                                })
+                                                return links;
+                                            }
+                                            );
+    }else{
+        linkList = await browserPage.evaluate(() => {
                                             let els = Array.from(document.querySelectorAll('[class^="basicList_link"]'));
                                             
                                             let links = els.map( el =>{
@@ -231,14 +274,16 @@ async function findAndClick( browserPage, keyword, categoryMid, userAgent, delay
                                             return links;
                                         }
                                         );
+    }
 
 
     for( i = 0; i < linkList.length ; i++){
         el = linkList[i];
         if( !el.nclick )
             continue;
-        if( el  && el.nclick.indexOf(categoryMid) > 0 ){
+        if( el  && el.nclick.indexOf(categoryMid) >= 0 ){
             logger.debug(`click to  ${el.nclick} id:${el.id}`);
+            await browserPage.focus("#"+el.id);
             await browserPage.click("#"+el.id);
             
             let pages = await Browser.pages();
@@ -248,17 +293,42 @@ async function findAndClick( browserPage, keyword, categoryMid, userAgent, delay
                 width:WIDTH,
                 height:HEIGHT
                 });             
-            try{ 
-                await npage.waitForNavigation();
-                await autoScroll(npage,delay);
-            }catch(e){}
-            await npage.close();
-            return;
-        }
-    }
 
-    logger.info("can't find ");
+            await autoScroll(browserPage,delay);
+
+            if( isMobile(userAgent)){
+
+            }else{
+                await npage.close();            
+            }
+                return;
+            }
+    }
 }
+
+
+
+async function clearBrowser(){
+    try{
+      logger.debug(`trying to release IP `);
+  
+      ps.lookup({
+        command: 'Chromium',
+        }, function(err, resultList ) {
+        if (err) {
+            throw new Error( err );
+        }
+     
+        resultList.forEach(function( proc ){
+            if( proc ){
+                process.kill(proc.pid,SIGINT);
+            }
+        });
+    });
+  
+    }catch(e){}
+  
+  }
 
 module.exports = {
     initBrowser,
@@ -267,5 +337,6 @@ module.exports = {
     findAndClick,
     clearCookie,
     visitUrl,
-    visitBlogAndClick
+    visitBlogAndClick,
+    clearBrowser
 }
