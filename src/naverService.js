@@ -120,6 +120,13 @@ async function visitUrl( url,opt){
 
 }
 
+async function sleepBrowser(delayTime){
+    delayTime = delayTime || 10;
+    await new Promise((resolve, reject) => 
+        setTimeout(()=>resolve(),1000 * delayTime)
+    ) ;
+}
+
 async function visitBlogAndClick( browserPage, blogId, clickLatest, userAgent,delay ){
     delay = delay || 1000;
 
@@ -218,24 +225,32 @@ async function findAndClick( browserPage, keyword, categoryMid, userAgent, delay
     if( userAgent ){
         await browserPage.setUserAgent(userAgent);
         if( isMobile(userAgent)){
-            url = `https://m.search.naver.com/search.naver?sm=mtb_hty.top&where=m&query=${keyword}`;    
+            url = `https://m.shopping.naver.com/`;    
 
         }else{
-            url = `https://search.shopping.naver.com/search/all?query=${keyword}&cat_id=&frm=NVSHATC`;
+            url = `https://shopping.naver.com/`;
         }
     }
     try{
         await browserPage.goto( url);
+//        await browserPage.waitForNavigation();
+        await sleepBrowser(3);
     }catch(e){
         logger.error("can't go to "+url +" reason: "+e.message);
         return;
     }
 
+    await browserPage.focus('[name="query"]');    
+    await browserPage.evaluate((_keyword) => {
+        document.querySelector("[name='query']").value = _keyword ;
+    }, keyword);
+
     if( isMobile(userAgent)){
-        await new Promise((resolve, reject) => 
-            setTimeout(()=>resolve(),1000*3)
-        ) ;
+        await browserPage.keyboard.press("Enter");
+        await browserPage.waitForNavigation();
     }else{
+        await browserPage.click("[_clickcode='search']");
+        await browserPage.waitForNavigation();
         await autoScroll(browserPage,delay);
     }
 
@@ -243,14 +258,14 @@ async function findAndClick( browserPage, keyword, categoryMid, userAgent, delay
 
     if( isMobile(userAgent ) ){
         linkList = await browserPage.evaluate(() => {
-                                                let els = Array.from(document.querySelectorAll('.product'));
+                                                let els = Array.from(document.querySelectorAll('[class^="product_info_main"]'));
                                                 
                                                 let links = els.map( el =>{
                                                     el.id = 'link_'+ Math.floor(Math.random() * 1000); 
                                                     
                                                     parent = el.parentElement;
                                                 return{
-                                                    nclick : parent.getAttribute('data-nvmid'),
+                                                    nclick : el.getAttribute('data-nclick'),
                                                     href : el.getAttribute('href'),
                                                     id: el.id
                                                 }
@@ -277,13 +292,22 @@ async function findAndClick( browserPage, keyword, categoryMid, userAgent, delay
     }
 
 
+
     for( i = 0; i < linkList.length ; i++){
         el = linkList[i];
         if( !el.nclick )
             continue;
         if( el  && el.nclick.indexOf(categoryMid) >= 0 ){
             logger.debug(`click to  ${el.nclick} id:${el.id}`);
+
+            await browserPage.evaluate((_id)=>{
+                let el = document.querySelector('#'+_id);
+                el.scrollIntoView();
+            },el.id);
+        
+
             await browserPage.focus("#"+el.id);
+            await sleepBrowser(10);
             await browserPage.click("#"+el.id);
             
             let pages = await Browser.pages();
@@ -297,7 +321,7 @@ async function findAndClick( browserPage, keyword, categoryMid, userAgent, delay
             await autoScroll(browserPage,delay);
 
             if( isMobile(userAgent)){
-
+                sleepBrowser(3);
             }else{
                 await npage.close();            
             }

@@ -107,10 +107,17 @@ function filter(vpns){
                     for( let k = 0 ; k < options.user_agents.length && k < user_agents_length; k++){
                         
                         logger.info(`[${optionItem.keyword}]  ${options.user_agents[k]}`)
+/*
                         await naverService.findAndClick( browserPage,encodeURI( optionItem.keyword.split(' ').join('+') ), 
                                                         optionItem.ca_mid, options.user_agents[k],
                                                         options.scroll 
                                                         );
+*/
+                        await naverService.findAndClick( browserPage, optionItem.keyword, 
+                                                        optionItem.ca_mid, options.user_agents[k],
+                                                        options.scroll 
+                        );
+
                         try{
                             await naverService.clearCookie(browserPage);
                         }catch(e){
