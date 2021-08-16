@@ -293,7 +293,7 @@ async function findAndClick( browserPage, keyword, categoryMid, userAgent, delay
                 await lastpage.close();            
             }
                 break;
-            }
+        }
     }
     try{
         await npage.close();

@@ -4,6 +4,7 @@ const nordVpn = require('./src/nordvpn');
 const naverService = require('./src/naverService')
 const path = require('path');
 const fs = require('fs');
+var schedule = require('node-schedule');
 
 function loadConfig( filePath ){
     logger.debug('loading config: '+filePath);
@@ -28,23 +29,9 @@ function loadConfig( filePath ){
 	}
 }
 
-(async function main(){
+async function nordRunner(options){
 
-    var options={};
-	
-    param = process.argv[2] || 'conf.cfg';
-
-    if( !process.argv[2]){
-	 param = "conf" + path.sep + param;
-    } 
-
-    options = loadConfig( param );
-    
-    if( !options.items || options.items.length == 0 ){
-        logger.error("can't find item");
-        logger.error( JSON.stringify(options));
-        return;
-    }
+    options = options || {};
 
     let vpns = [];
 
@@ -121,6 +108,32 @@ function loadConfig( filePath ){
     }    
     naverService.closeBrowser();
     process.exit();    
+}
 
+(async function main(){
+    var options={};
+
+    param = process.argv[2] || 'conf.cfg';
+
+    if( !process.argv[2]){
+	 param = "conf" + path.sep + param;
+    } 
+
+    options = loadConfig( param );
+    
+    if( !options.items || options.items.length == 0 ){
+        logger.error("can't find item");
+        logger.error( JSON.stringify(options));
+        return;
+    }
+
+    if( options.schedule ){
+        logger.info(`nordRunner will be runned by ${options.schedule} `);
+        var j = schedule.scheduleJob(options.schedule, function(){  // this for one hour
+            nordRunner(options);
+        });
+    }else{
+        logger.info('just run once')
+        nordRunner(options);
+    }
 })();
-
