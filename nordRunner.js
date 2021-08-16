@@ -107,10 +107,9 @@ async function nordRunner(options){
         }
     }    
     naverService.closeBrowser();
-    process.exit();    
 }
 
-(async function main(){
+( function main(){
     var options={};
 
     param = process.argv[2] || 'conf.cfg';
@@ -129,8 +128,10 @@ async function nordRunner(options){
 
     if( options.schedule ){
         logger.info(`nordRunner will be runned by ${options.schedule} `);
-        var j = schedule.scheduleJob(options.schedule, function(){  // this for one hour
-            nordRunner(options);
+        var j = schedule.scheduleJob(options.schedule, async function(){  // this for one hour
+            logger.info('start job');
+            await nordRunner(options);
+            logger.info('close job')
         });
     }else{
         logger.info('just run once')
