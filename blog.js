@@ -9,18 +9,19 @@ const Promise = require('bluebird');
 const which = require('which');
 const prompt = require('prompt');
 const logger = require('./src/logger');
-const ListVPNs = require('./src/api');
 const filePath = path.join(os.tmpdir(), 'openvpnconf');
 const puppeteer = require('puppeteer');
-const easyVpn = require('./src/easyvpn');
+const nordvpn = require('./src/nordvpn');
 
 function loadConfig( filePath ){
     logger.debug('loading config: '+filePath);
     
 	var data = fs.readFileSync(__dirname + path.sep + param,'utf8');
 	try{
-        logger.debug( data);
-		return JSON.parse(data);
+        data =  JSON.parse(data);
+        if( data.vpns)    
+            data.vpns.sort((a,b) => { return Math.random () - Math.random()} );        
+        return data;
 	}catch(e){
 		logger.error("can't parse config.cfg. use default value:");
         logger.error(e);
@@ -28,13 +29,6 @@ function loadConfig( filePath ){
 	}
 }
 
-function filter(vpns){
-    return vpns.filter(vpn =>{
-  
-          return vpn.countryNames.indexOf('kr') !== -1;
-        }
-       );
-  };
 
 (async function main(){
 	var options={};
@@ -51,24 +45,18 @@ function filter(vpns){
         logger.error("can't parse config.");
         process.exit(1);
     }
+    let vpns = [];
 
-    let vpns;
-    if( options.useVpn){
+    if( options.useVpn == true){
         try{
-            vpns = await ListVPNs(options.proxy); 
-            const countries = Array.from(new Set(vpns.map(vpn => vpn.countryShort)));
-            vpns = filter(vpns);
-            vpns = vpns.sort((a, b) => (b.score - a.score));
-            vpns = vpns.slice ( 0, vpns.length /2 ); // 하위 1/2는 버린다.
-            vpns = vpns.sort(() => Math.random() - 0.5);
-            logger.info(`available Proxies : ${vpns.length}`);
+            await nordvpn.disconnect();
+            vpns = nordvpn.getVpns(options);
         }catch(e){
-            logger.error("can't connect VPN");
             logger.error(e.message);
+            logger.error(e.stack);
             process.exit();
-            return;
         }
-        await easyVpn.disconnect();
+
     }
 
     browserPage = await naverService.initBrowser();
@@ -79,9 +67,8 @@ function filter(vpns){
     for( let vpnIndex = 0 ;   vpnIndex < vpns.length ; vpnIndex++){
         if( options.useVpn){
             let vpn = vpns[ vpnIndex ];
-            logger.info(`trying to get IP from ${vpnIndex+1}th proxy. ${vpn.ip} ${vpn.countryShort} ${vpn.score}`);
             try{
-                await easyVpn.connect(vpn);
+                await nordvpn.connect(vpn);
                 logger.info(`IP changing was completed`);
             }catch(e){
                 logger.error(e);
@@ -111,9 +98,8 @@ function filter(vpns){
         }
 
         if( options.useVpn){
-            await easyVpn.disconnect();
+            await nordvpn.disconnect();
             logger.info(`IP was recovered.`);
-    
         }
     }    
 

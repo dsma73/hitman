@@ -117,10 +117,7 @@ async function disconnect(){
   return new Promise(resolve => setTimeout(resolve, 1000 * 10));
 }
 
-
-
 async function cleanBrowser(){
-
   try{
     logger.debug(`trying to release IP `);
 

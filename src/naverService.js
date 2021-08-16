@@ -104,20 +104,13 @@ async function visitUrl( url,opt){
 
     if( opt.userAgent )
         await npage.setUserAgent(opt.userAgent);
-//    try{
+
     await npage.goto( url);
-//    await npage.waitForNavigation();
 
     if( opt.shouldScroll ){
         await autoScroll(npage);
     }
-    setTimeout(()=> npage.close(),1000*2)
-  // }catch(e){
-  //      logger.error(e);
-  //      npage.close();
-   //     Promise.resolve();
-   // }
-
+    setTimeout(()=> npage.close(),opt.timeout)
 }
 
 async function sleepBrowser(delayTime){
@@ -147,7 +140,6 @@ async function visitBlogAndClick( browserPage, blogId, clickLatest, userAgent,de
 
                 if( thumbnails && thumbnails.length > 0){
                     els = Array.from( thumbnails);
-
                 }
             }
         )
@@ -184,30 +176,6 @@ async function visitBlogAndClick( browserPage, blogId, clickLatest, userAgent,de
     }
 
     return;
-        
-    /*
-    let pages = await Browser.pages();
-    let npage = pages[pages.length-1];
-    await npage.setViewport({
-        width:WIDTH,
-        height:HEIGHT
-        });             
-
-    try{ 
-//        await npage.waitForNavigation();
-        await autoScroll(npage,delay);
-    }catch(e){
-        logger.error('error in auto scrolling detail view'+e);
-        await new Promise((resolve, reject) => 
-                setTimeout(()=>resolve(),1000*3)
-            );
-    }
-
-    await npage.close();
-
-*/
-
-
 
 }
 
@@ -216,48 +184,53 @@ function isMobile(userAgent) {
 };
 
 async function findAndClick( browserPage, keyword, categoryMid, userAgent, delay ){
-    logger.debug(`findItem : key: ${keyword} mid: ${categoryMid} ${userAgent}`);
+
+    const npage = await Browser.newPage();
+    logger.info(`findItem : key: ${keyword} mid: ${categoryMid} ${userAgent}`);
 
     let url = '';
     let selector;
     let attribute="";
 
     if( userAgent ){
-        await browserPage.setUserAgent(userAgent);
+        await npage.setUserAgent(userAgent);
         if( isMobile(userAgent)){
             url = `https://m.shopping.naver.com/`;    
-
+            const mobile = puppeteer.devices['iPhone X']
+            await npage.emulate(mobile)
         }else{
             url = `https://shopping.naver.com/`;
+            await npage.setViewport({width:1800, height:1100})
+//            await npage.waitFor(1000);
         }
     }
     try{
-        await browserPage.goto( url);
-//        await browserPage.waitForNavigation();
-        await sleepBrowser(3);
+        await npage.goto( url);
+        await sleepBrowser(1);
     }catch(e){
         logger.error("can't go to "+url +" reason: "+e.message);
-        return;
+        return "";
     }
 
-    await browserPage.focus('[name="query"]');    
-    await browserPage.evaluate((_keyword) => {
+    await npage.focus('[name="query"]');    
+    await npage.evaluate((_keyword) => {
         document.querySelector("[name='query']").value = _keyword ;
     }, keyword);
 
+
+    await sleepBrowser(1)
+
     if( isMobile(userAgent)){
-        await browserPage.keyboard.press("Enter");
-        await browserPage.waitForNavigation();
+        await npage.keyboard.press("Enter");
     }else{
-        await browserPage.click("[_clickcode='search']");
-        await browserPage.waitForNavigation();
-        await autoScroll(browserPage,delay);
+        await npage.click("[_clickcode='search']");
     }
+    await sleepBrowser(4)
 
     let linkList;
 
     if( isMobile(userAgent ) ){
-        linkList = await browserPage.evaluate(() => {
+        linkList = await npage.evaluate(() => {
                                                 let els = Array.from(document.querySelectorAll('[class^="product_info_main"]'));
                                                 
                                                 let links = els.map( el =>{
@@ -274,7 +247,7 @@ async function findAndClick( browserPage, keyword, categoryMid, userAgent, delay
                                             }
                                             );
     }else{
-        linkList = await browserPage.evaluate(() => {
+        linkList = await npage.evaluate(() => {
                                             let els = Array.from(document.querySelectorAll('[class^="basicList_link"]'));
                                             
                                             let links = els.map( el =>{
@@ -300,34 +273,34 @@ async function findAndClick( browserPage, keyword, categoryMid, userAgent, delay
         if( el  && el.nclick.indexOf(categoryMid) >= 0 ){
             logger.debug(`click to  ${el.nclick} id:${el.id}`);
 
-            await browserPage.evaluate((_id)=>{
+            await npage.evaluate((_id)=>{
                 let el = document.querySelector('#'+_id);
                 el.scrollIntoView();
             },el.id);
         
 
-            await browserPage.focus("#"+el.id);
-            await sleepBrowser(10);
-            await browserPage.click("#"+el.id);
-            
-            let pages = await Browser.pages();
+            await npage.focus("#"+el.id);
+            await sleepBrowser(1);
+            await npage.click("#"+el.id);
 
-            let npage = pages[pages.length-1];
-            await npage.setViewport({
-                width:WIDTH,
-                height:HEIGHT
-                });             
+            await autoScroll(npage,delay);
 
-            await autoScroll(browserPage,delay);
-
-            if( isMobile(userAgent)){
-                sleepBrowser(3);
-            }else{
-                await npage.close();            
+            if( !isMobile(userAgent)){
+                await sleepBrowser(1);
+                let pages = await Browser.pages();                
+                let lastpage = pages[pages.length-1];
+                await autoScroll(lastpage, delay);
+                await lastpage.close();            
             }
-                return;
+                break;
             }
     }
+    try{
+        await npage.close();
+    }catch(e){
+
+    }
+    return "";
 }
 
 
